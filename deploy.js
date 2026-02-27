@@ -1,25 +1,17 @@
 import solc from 'solc';
 import { createPublicClient, createWalletClient, http, defineChain } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { baseSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 import { readFileSync } from 'fs';
 
 // ========== CONFIG ==========
-// Private key'ini buraya yaz (0x ile başlamalı)
-// Test cüzdanı oluştur: https://vanity-eth.tk/
-// Base Sepolia faucet: https://www.coinbase.com/faucets/base-ethereum-goerli-faucet
 const PRIVATE_KEY = process.env.PRIVATE_KEY || '0x_PRIVATE_KEY_BURAYA';
 // ============================
 
 if (PRIVATE_KEY === '0x_PRIVATE_KEY_BURAYA') {
   console.log('\n=== DEPLOY ADIMLARI ===\n');
-  console.log('1. Test cüzdanı oluştur:');
-  console.log('   https://vanity-eth.tk/ adresinden "Generate" tıkla');
-  console.log('   Private Key ve Address\'i kopyala\n');
-  console.log('2. Base Sepolia testnet ETH al:');
-  console.log('   https://www.coinbase.com/faucets/base-ethereum-goerli-faucet');
-  console.log('   veya https://faucet.quicknode.com/base/sepolia\n');
-  console.log('3. Deploy et:');
+  console.log('1. Base mainnet cuzdaninda ETH oldugundan emin ol\n');
+  console.log('2. Deploy et:');
   console.log('   $env:PRIVATE_KEY="0xSENIN_PRIVATE_KEY"');
   console.log('   node deploy.js\n');
   process.exit(0);
@@ -60,14 +52,14 @@ const account = privateKeyToAccount(PRIVATE_KEY);
 console.log(`Deploying from: ${account.address}`);
 
 const publicClient = createPublicClient({
-  chain: baseSepolia,
-  transport: http('https://sepolia.base.org'),
+  chain: base,
+  transport: http('https://mainnet.base.org'),
 });
 
 const walletClient = createWalletClient({
   account,
-  chain: baseSepolia,
-  transport: http('https://sepolia.base.org'),
+  chain: base,
+  transport: http('https://mainnet.base.org'),
 });
 
 async function deploy() {
@@ -76,13 +68,12 @@ async function deploy() {
   console.log(`Balance: ${ethBal.toFixed(6)} ETH`);
 
   if (ethBal < 0.001) {
-    console.error('\nYetersiz bakiye! Base Sepolia testnet ETH al:');
-    console.error('https://www.coinbase.com/faucets/base-ethereum-goerli-faucet');
+    console.error('\nYetersiz bakiye! Base mainnet ETH gerekli.');
     console.error(`Adresin: ${account.address}`);
     process.exit(1);
   }
 
-  console.log('Deploying to Base Sepolia...');
+  console.log('Deploying to Base mainnet...');
 
   const hash = await walletClient.deployContract({
     abi,
@@ -99,7 +90,7 @@ async function deploy() {
   console.log(`Contract Address: ${receipt.contractAddress}`);
   console.log(`Block: ${receipt.blockNumber}`);
   console.log(`Gas Used: ${receipt.gasUsed}`);
-  console.log(`\nBasescan: https://sepolia.basescan.org/address/${receipt.contractAddress}`);
+  console.log(`\nBasescan: https://basescan.org/address/${receipt.contractAddress}`);
   console.log('\n=== SONRAKI ADIM ===');
   console.log(`contract.js dosyasinda CONTRACT_ADDRESS degerini guncelle:`);
   console.log(`export const CONTRACT_ADDRESS = '${receipt.contractAddress}';`);

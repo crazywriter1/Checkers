@@ -4,7 +4,7 @@ import { CONTRACT_ADDRESS, decodeScoreEvent } from './contract.js';
 // ========== CONFIG ==========
 // Etherscan API V2 - tek API key tüm chainlerde çalışır
 const API_KEY = '8HIB9IQ9ZUIJJBE452V2G4P6J92988X3M8';
-const USE_TESTNET = true;
+const USE_TESTNET = false;
 // ============================
 
 const ETHERSCAN_V2 = 'https://api.etherscan.io/v2/api';

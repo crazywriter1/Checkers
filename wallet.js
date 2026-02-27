@@ -9,7 +9,7 @@ import { baseSepolia, base } from 'https://esm.sh/viem@2/chains';
 import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
 
 // true = Base Sepolia (testnet), false = Base (mainnet)
-const USE_TESTNET = true;
+const USE_TESTNET = false;
 const CHAIN = USE_TESTNET ? baseSepolia : base;
 
 let publicClient = null;
