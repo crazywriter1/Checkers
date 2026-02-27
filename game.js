@@ -423,7 +423,7 @@ async function shareScore() {
   if (!isMiniApp) return;
   try {
     const name = fcUser ? (fcUser.displayName || fcUser.username) : 'I';
-    const text = `${name} scored ${playerScore}-${aiScore} in Base Dama! Can you beat the AI?`;
+    const text = `${name} scored ${playerScore}-${aiScore} in Checkers! Can you beat the AI?`;
     await sdk.actions.openUrl(
       `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(window.location.href)}`
     );

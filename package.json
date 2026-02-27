@@ -1,5 +1,5 @@
 {
-  "name": "base-dama",
+  "name": "checkers",
   "version": "1.0.0",
   "type": "module",
   "description": "Checkers (Dama) Mini App for Farcaster",
