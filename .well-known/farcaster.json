@@ -9,18 +9,18 @@
     "name": "Base Dama",
     "subtitle": "Checkers vs AI",
     "description": "Play classic checkers against AI on your mobile. Fast-paced, simple rules, modern design.",
-    "iconUrl": "https://[DOMAIN]/icon.png",
-    "homeUrl": "https://[DOMAIN]",
-    "imageUrl": "https://[DOMAIN]/preview.png",
-    "splashImageUrl": "https://[DOMAIN]/icon.png",
+    "iconUrl": "https://checkers-ebon.vercel.app/icon.png",
+    "homeUrl": "https://checkers-ebon.vercel.app",
+    "imageUrl": "https://checkers-ebon.vercel.app/preview.png",
+    "splashImageUrl": "https://checkers-ebon.vercel.app/icon.png",
     "splashBackgroundColor": "#1a1a2e",
     "primaryCategory": "games",
     "tags": ["game", "checkers", "dama", "farcaster"],
     "tagline": "Checkers vs AI - Play Now!",
-    "heroImageUrl": "https://[DOMAIN]/preview.png",
-    "screenshotUrls": ["https://[DOMAIN]/preview.png"],
+    "heroImageUrl": "https://checkers-ebon.vercel.app/preview.png",
+    "screenshotUrls": ["https://checkers-ebon.vercel.app/preview.png"],
     "ogTitle": "Base Dama - Checkers vs AI",
     "ogDescription": "Play classic checkers against AI. Fast, fun, mobile-friendly!",
-    "ogImageUrl": "https://[DOMAIN]/preview.png"
+    "ogImageUrl": "https://checkers-ebon.vercel.app/preview.png"
   }
 }
