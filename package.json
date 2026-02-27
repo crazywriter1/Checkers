@@ -1,0 +1,17 @@
+{
+  "name": "base-dama",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Checkers (Dama) Mini App for Farcaster",
+  "scripts": {
+    "dev": "npx serve . -p 3000",
+    "deploy": "node deploy.js"
+  },
+  "devDependencies": {
+    "serve": "^14.2.0"
+  },
+  "dependencies": {
+    "solc": "^0.8.34",
+    "viem": "^2.46.3"
+  }
+}

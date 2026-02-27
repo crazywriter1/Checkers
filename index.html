@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <!-- Farcaster Mini App -->
+  <meta property="fc:frame" content="vNext">
+  <meta property="fc:frame:image" content="https://[DOMAIN]/preview.png">
+  <meta property="fc:frame:button:1" content="Play Checkers">
+  <meta property="fc:frame:button:1:action" content="link">
+  <meta property="fc:frame:button:1:target" content="https://[DOMAIN]">
+
+  <!-- Base -->
+  <meta name="base:app_id" content="[SONRA EKLENECEK]">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Base Dama - Checkers vs AI">
+  <meta property="og:description" content="Play classic checkers against AI. Fast, fun, mobile-friendly!">
+  <meta property="og:image" content="https://[DOMAIN]/preview.png">
+
+  <title>Base Dama</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Wallet Bar -->
+    <div id="wallet-bar">
+      <div id="wallet-status">
+        <img id="user-pfp" class="hidden" alt="">
+        <span id="wallet-dot"></span>
+        <span id="wallet-addr">Not connected</span>
+      </div>
+      <div id="wallet-info">
+        <span id="wallet-chain"></span>
+        <span id="wallet-bal"></span>
+      </div>
+    </div>
+
+    <header id="header">
+      <div class="score-bar">
+        <div class="score-item">
+          <span class="score-label">You</span>
+          <span id="player-score" class="score-value">0</span>
+        </div>
+        <div class="title-area">
+          <h1>Base Dama</h1>
+          <div id="onchain-stats" class="hidden">
+            <span id="stat-high">Best: -</span>
+            <span id="stat-games">Games: -</span>
+          </div>
+        </div>
+        <div class="score-item">
+          <span class="score-label">AI</span>
+          <span id="ai-score" class="score-value">0</span>
+        </div>
+      </div>
+      <div id="turn-indicator">Your Turn</div>
+    </header>
+
+    <main id="board-container">
+      <canvas id="board"></canvas>
+    </main>
+
+    <footer id="controls">
+      <button id="leaderboard-btn">Leaderboard</button>
+      <button id="restart-btn">Restart</button>
+    </footer>
+
+    <!-- Result Overlay -->
+    <div id="result-overlay" class="hidden">
+      <div class="result-box">
+        <h2 id="result-title"></h2>
+        <p id="result-msg"></p>
+        <div class="result-actions">
+          <button id="submit-score-btn" class="hidden">Submit Score On-chain</button>
+          <button id="submit-tip-btn" class="hidden">Submit + Tip Dev</button>
+          <div id="tx-status" class="hidden"></div>
+          <button id="share-btn" class="hidden">Share Score</button>
+          <button id="result-restart-btn">Play Again</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leaderboard Overlay -->
+    <div id="leaderboard-overlay" class="hidden">
+      <div class="leaderboard-box">
+        <div class="lb-header">
+          <h2>Leaderboard</h2>
+          <button id="lb-close">&times;</button>
+        </div>
+        <div id="lb-content">
+          <p class="lb-loading">Loading...</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>

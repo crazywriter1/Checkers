@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Base Dama - Generate Icons</title>
+  <style>
+    body {
+      background: #0f0f1a;
+      color: #eaeaea;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      gap: 24px;
+    }
+    h1 { font-size: 20px; }
+    h2 { font-size: 16px; color: #8888aa; }
+    canvas { border-radius: 12px; }
+    a {
+      display: inline-block;
+      background: #e94560;
+      color: #fff;
+      text-decoration: none;
+      padding: 10px 24px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 14px;
+      margin-top: 8px;
+    }
+    .section { text-align: center; }
+  </style>
+</head>
+<body>
+  <h1>Base Dama - Icon Generator</h1>
+
+  <div class="section">
+    <h2>icon.png (200x200)</h2>
+    <canvas id="icon-canvas" width="200" height="200"></canvas>
+    <br>
+    <a id="icon-dl" download="icon.png">Download icon.png</a>
+  </div>
+
+  <div class="section">
+    <h2>preview.png (600x400)</h2>
+    <canvas id="preview-canvas" width="600" height="400"></canvas>
+    <br>
+    <a id="preview-dl" download="preview.png">Download preview.png</a>
+  </div>
+
+  <script>
+    function drawCheckerPiece(ctx, cx, cy, r, color1, color2, isKing) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      const grad = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.25, r * 0.1, cx, cy, r);
+      grad.addColorStop(0, color1);
+      grad.addColorStop(1, color2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.stroke();
+      if (isKing) {
+        ctx.fillStyle = '#f5c842';
+        ctx.font = `bold ${r * 0.9}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('K', cx, cy + 1);
+      }
+    }
+
+    // ICON
+    (function() {
+      const c = document.getElementById('icon-canvas');
+      const ctx = c.getContext('2d');
+      const w = 200, h = 200;
+
+      ctx.fillStyle = '#1a1a2e';
+      ctx.beginPath();
+      ctx.roundRect(0, 0, w, h, 24);
+      ctx.fill();
+
+      const grid = 4;
+      const cs = 36;
+      const ox = (w - grid * cs) / 2;
+      const oy = (h - grid * cs) / 2;
+
+      for (let r = 0; r < grid; r++) {
+        for (let cc = 0; cc < grid; cc++) {
+          const dark = (r + cc) % 2 === 1;
+          ctx.fillStyle = dark ? '#16213e' : '#0f3460';
+          ctx.fillRect(ox + cc * cs, oy + r * cs, cs, cs);
+        }
+      }
+
+      drawCheckerPiece(ctx, ox + 1.5 * cs, oy + 0.5 * cs, 14, '#fff', '#b0b0b0', false);
+      drawCheckerPiece(ctx, ox + 3.5 * cs, oy + 0.5 * cs, 14, '#fff', '#b0b0b0', false);
+      drawCheckerPiece(ctx, ox + 0.5 * cs, oy + 2.5 * cs, 14, '#ff6b81', '#c0392b', true);
+      drawCheckerPiece(ctx, ox + 2.5 * cs, oy + 2.5 * cs, 14, '#ff6b81', '#c0392b', false);
+      drawCheckerPiece(ctx, ox + 1.5 * cs, oy + 3.5 * cs, 14, '#ff6b81', '#c0392b', false);
+
+      document.getElementById('icon-dl').href = c.toDataURL('image/png');
+    })();
+
+    // PREVIEW
+    (function() {
+      const c = document.getElementById('preview-canvas');
+      const ctx = c.getContext('2d');
+      const w = 600, h = 400;
+
+      ctx.fillStyle = '#0f0f1a';
+      ctx.fillRect(0, 0, w, h);
+
+      const grid = 8;
+      const cs = 40;
+      const ox = (w - grid * cs) / 2;
+      const oy = (h - grid * cs) / 2 + 20;
+
+      for (let r = 0; r < grid; r++) {
+        for (let cc = 0; cc < grid; cc++) {
+          const dark = (r + cc) % 2 === 1;
+          ctx.fillStyle = dark ? '#16213e' : '#0f3460';
+          ctx.fillRect(ox + cc * cs, oy + r * cs, cs, cs);
+        }
+      }
+
+      const positions = [
+        [0, 1, 'ai'], [0, 3, 'ai'], [0, 5, 'ai'], [0, 7, 'ai'],
+        [1, 0, 'ai'], [1, 2, 'ai'], [1, 4, 'ai'],
+        [2, 3, 'ai'], [2, 5, 'ai'],
+        [3, 4, 'pk'],
+        [5, 0, 'p'], [5, 2, 'p'], [5, 4, 'p'],
+        [6, 1, 'p'], [6, 3, 'p'], [6, 5, 'p'], [6, 7, 'p'],
+        [7, 0, 'p'], [7, 2, 'p'], [7, 4, 'p'], [7, 6, 'p'],
+      ];
+
+      for (const [r, cc, type] of positions) {
+        const cx = ox + cc * cs + cs / 2;
+        const cy = oy + r * cs + cs / 2;
+        const isK = type === 'pk';
+        if (type === 'ai') {
+          drawCheckerPiece(ctx, cx, cy, 16, '#fff', '#b0b0b0', false);
+        } else {
+          drawCheckerPiece(ctx, cx, cy, 16, '#ff6b81', '#c0392b', isK);
+        }
+      }
+
+      ctx.fillStyle = '#f5c842';
+      ctx.fillRect(ox + 4 * cs, oy + 3 * cs, cs, 2);
+
+      ctx.fillStyle = '#eaeaea';
+      ctx.font = 'bold 28px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Base Dama', w / 2, 36);
+
+      ctx.fillStyle = '#8888aa';
+      ctx.font = '14px sans-serif';
+      ctx.fillText('Checkers vs AI  •  Play Now', w / 2, 58);
+
+      document.getElementById('preview-dl').href = c.toDataURL('image/png');
+    })();
+  </script>
+</body>
+</html>
