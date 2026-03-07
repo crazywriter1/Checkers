@@ -171,18 +171,69 @@ header {
   display: none;
 }
 
+#turn-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 4px 0 2px;
+  min-height: 24px;
+}
+
 #turn-indicator {
-  text-align: center;
   font-size: 13px;
   font-weight: 600;
   color: var(--gold);
-  padding: 4px 0 2px;
-  min-height: 24px;
   transition: color 0.2s;
 }
 
 #turn-indicator.ai-turn {
   color: var(--text-dim);
+}
+
+#timer-display {
+  font-size: 12px;
+  font-family: 'SF Mono', monospace;
+  color: var(--text-dim);
+  min-width: 2.5em;
+}
+
+#timer-display.hidden { display: none; }
+#timer-display.low { color: var(--accent); }
+
+#difficulty-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 0 4px;
+  flex-wrap: wrap;
+}
+
+.diff-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-right: 4px;
+}
+
+.diff-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-dim);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.diff-btn.active {
+  background: var(--accent2);
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.diff-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* ===== Board ===== */
@@ -232,6 +283,13 @@ button:active {
 #leaderboard-btn {
   background: var(--accent2);
   border: 1px solid rgba(255,255,255,0.1);
+}
+
+.confetti-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
 }
 
 /* ===== Result Overlay ===== */

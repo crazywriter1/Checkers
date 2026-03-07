@@ -38,11 +38,20 @@ const walletBal = document.getElementById('wallet-bal');
 const onchainStats = document.getElementById('onchain-stats');
 const statHigh = document.getElementById('stat-high');
 const statGames = document.getElementById('stat-games');
+const timerDisplay = document.getElementById('timer-display');
+const diffBtns = document.querySelectorAll('.diff-btn');
+const confettiCanvas = document.getElementById('confetti-canvas');
 
 // ===== State =====
 let cellSize, board, selected, validMoves, turn, playerScore, aiScore, animating;
 let isMiniApp = false;
 let fcUser = null;
+let aiDifficulty = 'easy';
+const MOVE_TIME_LIMIT = 30;
+let timeLeft = 0;
+let timerId = null;
+let timerEnabled = true;
+let audioContext = null;
 
 // ===== Helpers =====
 function isPlayer(p) { return p === PLAYER || p === PLAYER_KING; }
@@ -54,6 +63,50 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function haptic(type) {
   if (!isMiniApp) return;
   try { sdk.actions.triggerHaptic(type); } catch (_) {}
+}
+
+// ===== Sound =====
+function initAudio() {
+  if (audioContext) return;
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playSound(type) {
+  try {
+    if (!audioContext) initAudio();
+    if (audioContext.state === 'suspended') audioContext.resume();
+    const now = audioContext.currentTime;
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    osc.connect(gain);
+    gain.connect(audioContext.destination);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    if (type === 'move') {
+      osc.frequency.setValueAtTime(180, now);
+      osc.type = 'sine';
+    } else if (type === 'capture') {
+      osc.frequency.setValueAtTime(120, now);
+      osc.type = 'square';
+      gain.gain.setValueAtTime(0.15, now);
+    } else if (type === 'king') {
+      osc.frequency.setValueAtTime(520, now);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(660, now + 0.05);
+    } else if (type === 'win') {
+      osc.frequency.setValueAtTime(523, now);
+      osc.frequency.setValueAtTime(659, now + 0.08);
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    } else if (type === 'lose') {
+      osc.frequency.setValueAtTime(150, now);
+      osc.type = 'sawtooth';
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+    }
+    osc.start(now);
+    osc.stop(now + (type === 'king' ? 0.12 : type === 'win' ? 0.2 : type === 'lose' ? 0.15 : 0.08));
+  } catch (_) {}
 }
 
 // ===== SDK + Wallet Init =====
@@ -152,6 +205,7 @@ function init() {
   animating = false;
   playerScore = 0;
   aiScore = 0;
+  clearTimer();
   playerScoreEl.textContent = '0';
   aiScoreEl.textContent = '0';
   resultOverlay.classList.add('hidden');
@@ -161,6 +215,7 @@ function init() {
   txStatus.classList.add('hidden');
   updateTurnUI();
   resize();
+  if (timerEnabled && turn === 'player') startTimer();
 }
 
 function resize() {
@@ -293,6 +348,214 @@ function getAllMoves(side) {
   return allJumps.length > 0 ? allJumps : allSimple;
 }
 
+function copyBoard(b) {
+  return b.map(row => [...row]);
+}
+
+function getJumpsOnBoard(b, r, c, piece) {
+  const moves = [];
+  for (const [dr, dc] of getDirs(piece)) {
+    const mr = r + dr, mc = c + dc;
+    const lr = r + dr * 2, lc = c + dc * 2;
+    if (lr < 0 || lr >= ROWS || lc < 0 || lc >= COLS) continue;
+    if (b[mr][mc] === EMPTY || owner(b[mr][mc]) === owner(piece)) continue;
+    if (b[lr][lc] !== EMPTY) continue;
+    moves.push({ r: lr, c: lc, captured: [{ r: mr, c: mc }] });
+  }
+  return moves;
+}
+
+function getSimpleMovesOnBoard(b, r, c, piece) {
+  const moves = [];
+  for (const [dr, dc] of getDirs(piece)) {
+    const nr = r + dr, nc = c + dc;
+    if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+    if (b[nr][nc] !== EMPTY) continue;
+    moves.push({ r: nr, c: nc, captured: [] });
+  }
+  return moves;
+}
+
+function getAllMovesOnBoard(b, side) {
+  const check = side === 'player' ? isPlayer : isAI;
+  let allJumps = [], allSimple = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (!check(b[r][c])) continue;
+      const jumps = getJumpsOnBoard(b, r, c, b[r][c]);
+      if (jumps.length > 0) {
+        for (const j of jumps) allJumps.push({ from: { r, c }, ...j });
+      } else {
+        const simple = getSimpleMovesOnBoard(b, r, c, b[r][c]);
+        for (const s of simple) allSimple.push({ from: { r, c }, ...s });
+      }
+    }
+  }
+  return allJumps.length > 0 ? allJumps : allSimple;
+}
+
+function applyMoveToBoard(b, move) {
+  const { from, r: toR, c: toC, captured } = move;
+  const piece = b[from.r][from.c];
+  b[from.r][from.c] = EMPTY;
+  captured.forEach(cap => { b[cap.r][cap.c] = EMPTY; });
+  let finalPiece = piece;
+  if (isPlayer(piece) && toR === 0) finalPiece = PLAYER_KING;
+  if (isAI(piece) && toR === 7) finalPiece = AI_KING;
+  b[toR][toC] = finalPiece;
+  return { piece: finalPiece, capturedCount: captured.length };
+}
+
+function evaluateBoard(b) {
+  let score = 0;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const p = b[r][c];
+      if (isAI(p)) score += isKing(p) ? 3 : 1;
+      if (isPlayer(p)) score -= isKing(p) ? 3 : 1;
+    }
+  }
+  return score;
+}
+
+function getBestMove1Ply(moves) {
+  let bestScore = -Infinity;
+  let bestMove = moves[0];
+  for (const move of moves) {
+    const b = copyBoard(board);
+    applyMoveToBoard(b, move);
+    const score = evaluateBoard(b);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = move;
+    }
+  }
+  return bestMove;
+}
+
+function minimax(b, depth, maximizing) {
+  if (depth === 0) return evaluateBoard(b);
+  const side = maximizing ? 'ai' : 'player';
+  const moves = getAllMovesOnBoard(b, side);
+  if (moves.length === 0) return evaluateBoard(b);
+  let best = maximizing ? -Infinity : Infinity;
+  for (const move of moves) {
+    const clone = copyBoard(b);
+    applyMoveToBoard(clone, move);
+    const score = minimax(clone, depth - 1, !maximizing);
+    best = maximizing ? Math.max(best, score) : Math.min(best, score);
+  }
+  return best;
+}
+
+function getBestMoveMinimax(moves) {
+  const depth = 3;
+  let bestScore = -Infinity;
+  let bestMove = moves[0];
+  for (const move of moves) {
+    const b = copyBoard(board);
+    applyMoveToBoard(b, move);
+    const score = minimax(b, depth - 1, false);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMove = move;
+    }
+  }
+  return bestMove;
+}
+
+function getAIMove(moves) {
+  if (aiDifficulty === 'easy') {
+    const jumps = moves.filter(m => m.captured.length > 0);
+    if (jumps.length > 0) return jumps[Math.floor(Math.random() * jumps.length)];
+    const forward = moves.filter(m => m.r > m.from.r);
+    if (forward.length > 0 && Math.random() > 0.3) return forward[Math.floor(Math.random() * forward.length)];
+    return moves[Math.floor(Math.random() * moves.length)];
+  }
+  if (aiDifficulty === 'medium') return getBestMove1Ply(moves);
+  return getBestMoveMinimax(moves);
+}
+
+// ===== Timer =====
+function startTimer() {
+  clearTimer();
+  if (turn !== 'player' || !timerEnabled) return;
+  timeLeft = MOVE_TIME_LIMIT;
+  timerDisplay.classList.remove('hidden');
+  timerDisplay.classList.remove('low');
+  if (timeLeft <= 10) timerDisplay.classList.add('low');
+  timerDisplay.textContent = `0:${String(timeLeft).padStart(2, '0')}`;
+  timerId = setInterval(() => {
+    timeLeft--;
+    timerDisplay.textContent = `0:${String(timeLeft).padStart(2, '0')}`;
+    if (timeLeft <= 10) timerDisplay.classList.add('low');
+    if (timeLeft <= 0) {
+      clearTimer();
+      timeUp();
+    }
+  }, 1000);
+}
+
+function clearTimer() {
+  if (timerId) {
+    clearInterval(timerId);
+    timerId = null;
+  }
+  timerDisplay.classList.add('hidden');
+}
+
+function timeUp() {
+  if (turn !== 'player' || animating) return;
+  haptic('warning');
+  turn = 'ai';
+  updateTurnUI();
+  timerDisplay.classList.add('hidden');
+  draw();
+  if (!checkWin()) aiTurn();
+}
+
+// ===== Confetti =====
+function runConfetti() {
+  const c = confettiCanvas;
+  if (!c) return;
+  c.width = window.innerWidth;
+  c.height = window.innerHeight;
+  const cx = c.getContext('2d');
+  const colors = ['#e94560', '#f5c842', '#2ecc71', '#0f3460', '#ff6b81'];
+  const particles = [];
+  for (let i = 0; i < 45; i++) {
+    particles.push({
+      x: Math.random() * c.width,
+      y: Math.random() * c.height * 0.5,
+      vx: (Math.random() - 0.5) * 4,
+      vy: Math.random() * 2 + 2,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: Math.random() * 6 + 4,
+    });
+  }
+  let start = null;
+  function step(ts) {
+    if (!start) start = ts;
+    const dt = (ts - start) / 1000;
+    if (dt > 2) {
+      c.width = c.width;
+      return;
+    }
+    cx.clearRect(0, 0, c.width, c.height);
+    const g = 14;
+    for (const p of particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += g * 0.016;
+      if (p.y > c.height + 20) continue;
+      cx.fillStyle = p.color;
+      cx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
 // ===== Animation =====
 async function animateMove(fromR, fromC, toR, toC, captured) {
   animating = true;
@@ -301,6 +564,22 @@ async function animateMove(fromR, fromC, toR, toC, captured) {
   const frames = 8;
   const sx = fromC * s + s / 2, sy = fromR * s + s / 2;
   const ex = toC * s + s / 2, ey = toR * s + s / 2;
+
+  if (captured.length > 0) {
+    for (const cap of captured) {
+      const capX = cap.c * s + s / 2, capY = cap.r * s + s / 2;
+      for (let f = 0; f < 6; f++) {
+        draw();
+        const r = (f / 6) * s * 0.8;
+        ctx.strokeStyle = `rgba(233, 69, 96, ${1 - f / 6})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(capX, capY, r, 0, Math.PI * 2);
+        ctx.stroke();
+        await sleep(25);
+      }
+    }
+  }
 
   board[fromR][fromC] = EMPTY;
   captured.forEach(cap => { board[cap.r][cap.c] = EMPTY; });
@@ -317,7 +596,31 @@ async function animateMove(fromR, fromC, toR, toC, captured) {
   if (isAI(piece) && toR === 7) finalPiece = AI_KING;
   board[toR][toC] = finalPiece;
 
-  if (captured.length > 0) haptic('impact');
+  if (finalPiece !== piece) {
+    const kx = toC * s + s / 2, ky = toR * s + s / 2;
+    for (let pulse = 0; pulse < 10; pulse++) {
+      draw();
+      const alpha = 0.4 * (1 - pulse / 10);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(kx, ky, s * 0.5 + pulse * 4, 0, Math.PI * 2);
+      const grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, s * 0.5 + pulse * 4);
+      grad.addColorStop(0, `rgba(245, 200, 66, ${alpha})`);
+      grad.addColorStop(1, 'rgba(245, 200, 66, 0)');
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.restore();
+      await sleep(22);
+    }
+    playSound('king');
+  }
+
+  if (captured.length > 0) {
+    haptic('impact');
+    playSound('capture');
+  } else if (finalPiece === piece) {
+    playSound('move');
+  }
 
   draw();
   animating = false;
@@ -359,8 +662,11 @@ function checkWin() {
 }
 
 function endGame(title, msg, playerWon) {
+  clearTimer();
+  playSound(playerWon ? 'win' : 'lose');
   resultTitle.textContent = title;
   resultMsg.textContent = msg;
+  if (playerWon) runConfetti();
   resultOverlay.classList.remove('hidden');
 
   haptic(playerWon ? 'success' : 'error');
@@ -496,6 +802,7 @@ function cellFromPos(x, y) {
 
 async function handlePlayerClick(cell) {
   if (animating || turn !== 'player') return;
+  initAudio();
   const piece = board[cell.r][cell.c];
 
   if (selected) {
@@ -518,6 +825,7 @@ async function handlePlayerClick(cell) {
       selected = null;
       validMoves = [];
       turn = 'ai';
+      clearTimer();
       updateTurnUI();
       draw();
       if (!checkWin()) { await sleep(350); await aiTurn(); }
@@ -551,10 +859,11 @@ async function handlePlayerClick(cell) {
 // ===== AI =====
 async function aiTurn() {
   if (turn !== 'ai') return;
+  clearTimer();
   let allMoves = getAllMoves('ai');
   if (allMoves.length === 0) { checkWin(); return; }
 
-  let move = pickAIMove(allMoves);
+  let move = getAIMove(allMoves);
   let result = await animateMove(move.from.r, move.from.c, move.r, move.c, move.captured);
   updateScores('ai', result.capturedCount);
 
@@ -572,14 +881,7 @@ async function aiTurn() {
   updateTurnUI();
   draw();
   checkWin();
-}
-
-function pickAIMove(moves) {
-  const jumps = moves.filter(m => m.captured.length > 0);
-  if (jumps.length > 0) return jumps[Math.floor(Math.random() * jumps.length)];
-  const forward = moves.filter(m => m.r > m.from.r);
-  if (forward.length > 0 && Math.random() > 0.3) return forward[Math.floor(Math.random() * forward.length)];
-  return moves[Math.floor(Math.random() * moves.length)];
+  if (timerEnabled) startTimer();
 }
 
 // ===== Event Listeners =====
@@ -604,7 +906,19 @@ leaderboardBtn.addEventListener('click', showLeaderboard);
 lbClose.addEventListener('click', () => { leaderboardOverlay.classList.add('hidden'); });
 leaderboardOverlay.addEventListener('click', (e) => {
   if (e.target === leaderboardOverlay) leaderboardOverlay.classList.add('hidden');
+ });
+
+diffBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const diff = btn.dataset.diff;
+    if (!diff) return;
+    diffBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    aiDifficulty = diff;
+    haptic('selection');
+  });
 });
+
 window.addEventListener('resize', resize);
 
 // ===== Boot =====
