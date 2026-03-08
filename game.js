@@ -40,18 +40,37 @@ const statHigh = document.getElementById('stat-high');
 const statGames = document.getElementById('stat-games');
 const timerDisplay = document.getElementById('timer-display');
 const diffBtns = document.querySelectorAll('.diff-btn');
+const colorBtns = document.querySelectorAll('.color-btn');
 const confettiCanvas = document.getElementById('confetti-canvas');
+const scoreCardCanvas = document.getElementById('score-card-canvas');
 
 // ===== State =====
 let cellSize, board, selected, validMoves, turn, playerScore, aiScore, animating;
 let isMiniApp = false;
 let fcUser = null;
 let aiDifficulty = 'easy';
+let playerColor = 'red';
 const MOVE_TIME_LIMIT = 30;
 let timeLeft = 0;
 let timerId = null;
 let timerEnabled = true;
+let soundEnabled = true;
 let audioContext = null;
+let currentTheme = 'dark';
+
+const THEME_BOARDS = {
+  dark: { dark: '#16213e', light: '#0f3460' },
+  light: { dark: '#b8c4d0', light: '#d4dce4' },
+  classic: { dark: '#2d5016', light: '#4a7c23' },
+};
+
+const STORAGE_KEYS = {
+  sound: 'checkers_sound',
+  timer: 'checkers_timer',
+  theme: 'checkers_theme',
+  tutorialDone: 'checkers_tutorial_done',
+  stats: 'checkers_stats',
+};
 
 // ===== Helpers =====
 function isPlayer(p) { return p === PLAYER || p === PLAYER_KING; }
@@ -72,6 +91,7 @@ function initAudio() {
 }
 
 function playSound(type) {
+  if (!soundEnabled) return;
   try {
     if (!audioContext) initAudio();
     if (audioContext.state === 'suspended') audioContext.resume();
@@ -212,6 +232,8 @@ function init() {
   shareBtn.classList.add('hidden');
   submitScoreBtn.classList.add('hidden');
   submitTipBtn.classList.add('hidden');
+  const scoreCardBtn = document.getElementById('score-card-btn');
+  if (scoreCardBtn) scoreCardBtn.classList.add('hidden');
   txStatus.classList.add('hidden');
   updateTurnUI();
   resize();
@@ -237,9 +259,10 @@ function draw() {
   const s = cellSize;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  const colors = THEME_BOARDS[currentTheme] || THEME_BOARDS.dark;
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      ctx.fillStyle = (r + c) % 2 === 1 ? '#16213e' : '#0f3460';
+      ctx.fillStyle = (r + c) % 2 === 1 ? colors.dark : colors.light;
       ctx.fillRect(c * s, r * s, s, s);
     }
   }
@@ -270,7 +293,8 @@ function drawPiece(cx, cy, radius, piece) {
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);
   const grad = ctx.createRadialGradient(cx - radius * 0.25, cy - radius * 0.25, radius * 0.1, cx, cy, radius);
-  if (isPlayer(piece)) {
+  const isRed = playerColor === 'red' ? isPlayer(piece) : isAI(piece);
+  if (isRed) {
     grad.addColorStop(0, '#ff6b81');
     grad.addColorStop(1, '#c0392b');
   } else {
@@ -280,7 +304,7 @@ function drawPiece(cx, cy, radius, piece) {
   ctx.fillStyle = grad;
   ctx.fill();
   ctx.lineWidth = 2;
-  ctx.strokeStyle = isPlayer(piece) ? '#8e1a2a' : '#888';
+  ctx.strokeStyle = isRed ? '#8e1a2a' : '#888';
   ctx.stroke();
   if (isKing(piece)) {
     ctx.fillStyle = '#f5c842';
@@ -449,7 +473,7 @@ function minimax(b, depth, maximizing) {
 }
 
 function getBestMoveMinimax(moves) {
-  const depth = 3;
+  const depth = 4;
   let bestScore = -Infinity;
   let bestMove = moves[0];
   for (const move of moves) {
@@ -467,12 +491,21 @@ function getBestMoveMinimax(moves) {
 function getAIMove(moves) {
   if (aiDifficulty === 'easy') {
     const jumps = moves.filter(m => m.captured.length > 0);
+    const safe = moves.filter(m => m.captured.length === 0);
+    if (jumps.length > 0 && safe.length > 0) {
+      if (Math.random() < 0.65) return safe[Math.floor(Math.random() * safe.length)];
+      return jumps[Math.floor(Math.random() * jumps.length)];
+    }
     if (jumps.length > 0) return jumps[Math.floor(Math.random() * jumps.length)];
-    const forward = moves.filter(m => m.r > m.from.r);
-    if (forward.length > 0 && Math.random() > 0.3) return forward[Math.floor(Math.random() * forward.length)];
+    if (safe.length > 0) return safe[Math.floor(Math.random() * safe.length)];
     return moves[Math.floor(Math.random() * moves.length)];
   }
-  if (aiDifficulty === 'medium') return getBestMove1Ply(moves);
+  if (aiDifficulty === 'medium') {
+    if (Math.random() < 0.35) {
+      return moves[Math.floor(Math.random() * moves.length)];
+    }
+    return getBestMove1Ply(moves);
+  }
   return getBestMoveMinimax(moves);
 }
 
@@ -663,6 +696,7 @@ function checkWin() {
 
 function endGame(title, msg, playerWon) {
   clearTimer();
+  recordGameResult(playerWon, playerScore);
   playSound(playerWon ? 'win' : 'lose');
   resultTitle.textContent = title;
   resultMsg.textContent = msg;
@@ -671,14 +705,20 @@ function endGame(title, msg, playerWon) {
 
   haptic(playerWon ? 'success' : 'error');
 
-  // Show blockchain buttons if wallet connected and contract configured
   if (isConnected() && isConfigured()) {
     submitScoreBtn.classList.remove('hidden');
     submitTipBtn.classList.remove('hidden');
+  } else {
+    submitScoreBtn.classList.add('hidden');
+    submitTipBtn.classList.add('hidden');
   }
 
-  if (playerWon && isMiniApp) {
-    shareBtn.classList.remove('hidden');
+  const scoreCardBtn = document.getElementById('score-card-btn');
+  if (playerWon) {
+    if (scoreCardBtn) scoreCardBtn.classList.remove('hidden');
+    if (isMiniApp) shareBtn.classList.remove('hidden');
+  } else {
+    if (scoreCardBtn) scoreCardBtn.classList.add('hidden');
   }
 }
 
@@ -906,7 +946,80 @@ leaderboardBtn.addEventListener('click', showLeaderboard);
 lbClose.addEventListener('click', () => { leaderboardOverlay.classList.add('hidden'); });
 leaderboardOverlay.addEventListener('click', (e) => {
   if (e.target === leaderboardOverlay) leaderboardOverlay.classList.add('hidden');
- });
+});
+
+const soundToggle = document.getElementById('sound-toggle');
+const timerToggle = document.getElementById('timer-toggle');
+if (soundToggle) {
+  soundToggle.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    saveSetting(STORAGE_KEYS.sound, soundEnabled ? '1' : '0');
+    soundToggle.textContent = soundEnabled ? '🔊' : '🔇';
+    soundToggle.classList.toggle('muted', !soundEnabled);
+    haptic('selection');
+  });
+  soundToggle.textContent = soundEnabled ? '🔊' : '🔇';
+  soundToggle.classList.toggle('muted', !soundEnabled);
+}
+if (timerToggle) {
+  timerToggle.addEventListener('click', () => {
+    timerEnabled = !timerEnabled;
+    saveSetting(STORAGE_KEYS.timer, timerEnabled ? '1' : '0');
+    timerToggle.classList.toggle('active', timerEnabled);
+    if (!timerEnabled) clearTimer();
+    else if (turn === 'player') startTimer();
+    haptic('selection');
+  });
+  timerToggle.classList.toggle('active', timerEnabled);
+}
+
+const themeBtns = document.querySelectorAll('.theme-btn');
+themeBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const theme = btn.dataset.theme;
+    if (!theme || !THEME_BOARDS[theme]) return;
+    themeBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTheme = theme;
+    document.body.dataset.theme = theme;
+    saveSetting(STORAGE_KEYS.theme, theme);
+    draw();
+    haptic('selection');
+  });
+});
+themeBtns.forEach(b => {
+  if (b.dataset.theme === currentTheme) b.classList.add('active');
+});
+
+function showStatsOverlay() {
+  const s = getLocalStats();
+  const total = s.wins + s.losses;
+  const winRate = total > 0 ? Math.round((s.wins / total) * 100) : 0;
+  const avgCaptures = total > 0 ? (s.totalCaptures / total).toFixed(1) : '0';
+  const content = document.getElementById('stats-content');
+  if (!content) return;
+  content.innerHTML = `
+    <div class="lb-section-title">Games</div>
+    <div class="lb-stat-row"><span class="lb-stat-label">Wins</span><span class="lb-stat-value">${s.wins}</span></div>
+    <div class="lb-stat-row"><span class="lb-stat-label">Losses</span><span class="lb-stat-value">${s.losses}</span></div>
+    <div class="lb-stat-row"><span class="lb-stat-label">Win rate</span><span class="lb-stat-value">${winRate}%</span></div>
+    <div class="lb-section-title">Captures</div>
+    <div class="lb-stat-row"><span class="lb-stat-label">Total</span><span class="lb-stat-value">${s.totalCaptures}</span></div>
+    <div class="lb-stat-row"><span class="lb-stat-label">Avg per game</span><span class="lb-stat-value">${avgCaptures}</span></div>
+    <div class="lb-section-title">Streak</div>
+    <div class="lb-stat-row"><span class="lb-stat-label">Current</span><span class="lb-stat-value">${s.currentStreak}</span></div>
+    <div class="lb-stat-row"><span class="lb-stat-label">Best</span><span class="lb-stat-value">${s.bestStreak}</span></div>
+  `;
+  document.getElementById('stats-overlay').classList.remove('hidden');
+}
+
+document.getElementById('stats-btn')?.addEventListener('click', () => { haptic('selection'); showStatsOverlay(); });
+document.getElementById('stats-close')?.addEventListener('click', () => { document.getElementById('stats-overlay').classList.add('hidden'); });
+document.getElementById('stats-overlay')?.addEventListener('click', (e) => {
+  if (e.target.id === 'stats-overlay') document.getElementById('stats-overlay').classList.add('hidden');
+});
+
+document.getElementById('score-card-btn')?.addEventListener('click', () => shareScoreCard());
 
 diffBtns.forEach(btn => {
   btn.addEventListener('click', () => {
@@ -919,11 +1032,168 @@ diffBtns.forEach(btn => {
   });
 });
 
+colorBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const color = btn.dataset.color;
+    if (!color) return;
+    colorBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    playerColor = color;
+    haptic('selection');
+    init();
+  });
+});
+
 window.addEventListener('resize', resize);
+
+// ===== Local Storage =====
+function loadSettings() {
+  try {
+    if (localStorage.getItem(STORAGE_KEYS.sound) === '0') soundEnabled = false;
+    if (localStorage.getItem(STORAGE_KEYS.timer) === '0') timerEnabled = false;
+    const t = localStorage.getItem(STORAGE_KEYS.theme);
+    if (t && THEME_BOARDS[t]) {
+      currentTheme = t;
+      document.body.dataset.theme = t;
+    }
+  } catch (_) {}
+}
+
+function saveSetting(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (_) {}
+}
+
+// ===== Local Stats =====
+function getLocalStats() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.stats);
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return { wins: 0, losses: 0, totalCaptures: 0, currentStreak: 0, bestStreak: 0 };
+}
+
+function saveLocalStats(stats) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.stats, JSON.stringify(stats));
+  } catch (_) {}
+}
+
+function recordGameResult(playerWon, captures) {
+  const s = getLocalStats();
+  if (playerWon) {
+    s.wins++;
+    s.currentStreak++;
+    if (s.currentStreak > s.bestStreak) s.bestStreak = s.currentStreak;
+  } else {
+    s.losses++;
+    s.currentStreak = 0;
+  }
+  s.totalCaptures += captures;
+  saveLocalStats(s);
+}
+
+// ===== Tutorial =====
+const TUTORIAL_SLIDES = [
+  { title: 'Welcome to Checkers', text: 'Tap a piece to select it, then tap a highlighted square to move.' },
+  { title: 'Captures', text: 'Jump over an enemy piece to capture it. You must capture when possible.' },
+  { title: 'Kings', text: 'When a piece reaches the opposite end, it becomes a King and can move both directions.' },
+  { title: 'Win', text: 'Capture all enemy pieces or block them so they have no moves. Good luck!' },
+];
+
+function showTutorialIfNeeded() {
+  try {
+    if (localStorage.getItem(STORAGE_KEYS.tutorialDone) === '1') return;
+  } catch (_) {}
+  const overlay = document.getElementById('tutorial-overlay');
+  const titleEl = document.getElementById('tutorial-title');
+  const textEl = document.getElementById('tutorial-text');
+  const nextBtn = document.getElementById('tutorial-next');
+  const startBtn = document.getElementById('tutorial-start');
+  const dontShow = document.getElementById('tutorial-dont-show');
+  let step = 0;
+  function show() {
+    if (step >= TUTORIAL_SLIDES.length) {
+      overlay.classList.add('hidden');
+      if (dontShow?.checked) saveSetting(STORAGE_KEYS.tutorialDone, '1');
+      return;
+    }
+    titleEl.textContent = TUTORIAL_SLIDES[step].title;
+    textEl.textContent = TUTORIAL_SLIDES[step].text;
+    nextBtn.classList.toggle('hidden', step === TUTORIAL_SLIDES.length - 1);
+    startBtn.classList.toggle('hidden', step !== TUTORIAL_SLIDES.length - 1);
+  }
+  nextBtn.onclick = () => { step++; show(); haptic('selection'); };
+  startBtn.onclick = () => { step++; show(); haptic('selection'); };
+  overlay.classList.remove('hidden');
+  show();
+}
+
+// ===== Score Card (Share) =====
+function drawScoreCardOnCanvas() {
+  if (!scoreCardCanvas) return false;
+  const c = scoreCardCanvas;
+  const cx = c.getContext('2d');
+  const w = c.width, h = c.height;
+  cx.fillStyle = '#1a1a2e';
+  cx.fillRect(0, 0, w, h);
+  cx.strokeStyle = '#f5c842';
+  cx.lineWidth = 4;
+  cx.strokeRect(8, 8, w - 16, h - 16);
+  cx.fillStyle = '#eaeaea';
+  cx.font = 'bold 28px sans-serif';
+  cx.textAlign = 'center';
+  cx.fillText('Checkers', w / 2, 52);
+  cx.font = '20px sans-serif';
+  cx.fillText('You won ' + playerScore + ' - ' + aiScore, w / 2, 100);
+  const name = fcUser ? (fcUser.displayName || fcUser.username) : 'Player';
+  cx.font = '16px sans-serif';
+  cx.fillStyle = '#8888aa';
+  cx.fillText(name, w / 2, 140);
+  cx.fillText(new Date().toLocaleDateString(), w / 2, 168);
+  cx.fillStyle = '#f5c842';
+  cx.font = '14px sans-serif';
+  cx.fillText('checkers-ebon.vercel.app', w / 2, 218);
+  return true;
+}
+
+async function shareScoreCard() {
+  if (!scoreCardCanvas) return;
+  drawScoreCardOnCanvas();
+  const name = fcUser ? (fcUser.displayName || fcUser.username) : 'I';
+  const text = name + ' won ' + playerScore + '-' + aiScore + ' in Checkers! Can you beat the AI?';
+
+  try {
+    const blob = await new Promise(resolve => scoreCardCanvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('No blob');
+    const file = new File([blob], 'checkers-score.png', { type: 'image/png' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        title: 'Checkers',
+        text,
+        files: [file],
+      });
+      haptic('success');
+      return;
+    }
+  } catch (_) {}
+
+  if (isMiniApp) {
+    try {
+      await sdk.actions.openUrl(
+        'https://warpcast.com/~/compose?text=' + encodeURIComponent(text) + '&embeds[]=' + encodeURIComponent(window.location.href)
+      );
+      haptic('success');
+    } catch (_) {}
+  }
+}
 
 // ===== Boot =====
 (async () => {
+  loadSettings();
   await initSDK();
   initBlockchain();
   init();
+  showTutorialIfNeeded();
 })();

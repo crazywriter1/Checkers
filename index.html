@@ -59,11 +59,28 @@
         <span id="turn-indicator">Your Turn</span>
         <span id="timer-display" class="hidden">0:30</span>
       </div>
-      <div id="difficulty-row">
-        <span class="diff-label">AI:</span>
-        <button type="button" class="diff-btn active" data-diff="easy">Easy</button>
-        <button type="button" class="diff-btn" data-diff="medium">Medium</button>
-        <button type="button" class="diff-btn" data-diff="hard">Hard</button>
+      <div id="options-row">
+        <div class="option-group">
+          <span class="diff-label">Color:</span>
+          <button type="button" class="color-btn active" data-color="red">Red</button>
+          <button type="button" class="color-btn" data-color="white">White</button>
+        </div>
+        <div class="option-group">
+          <span class="diff-label">AI:</span>
+          <button type="button" class="diff-btn active" data-diff="easy">Easy</button>
+          <button type="button" class="diff-btn" data-diff="medium">Medium</button>
+          <button type="button" class="diff-btn" data-diff="hard">Hard</button>
+        </div>
+        <div class="option-group">
+          <button type="button" id="sound-toggle" class="icon-btn" title="Sound">🔊</button>
+          <button type="button" id="timer-toggle" class="icon-btn active" title="Timer 30s">⏱</button>
+        </div>
+      </div>
+      <div class="option-group" style="justify-content: center; padding-top: 2px;">
+        <span class="diff-label">Theme:</span>
+        <button type="button" class="theme-btn active" data-theme="dark">Dark</button>
+        <button type="button" class="theme-btn" data-theme="light">Light</button>
+        <button type="button" class="theme-btn" data-theme="classic">Classic</button>
       </div>
     </header>
 
@@ -72,6 +89,7 @@
     </main>
 
     <footer id="controls">
+      <button id="stats-btn">My Stats</button>
       <button id="leaderboard-btn">Leaderboard</button>
       <button id="restart-btn">Restart</button>
     </footer>
@@ -85,6 +103,7 @@
           <button id="submit-score-btn" class="hidden">Submit Score On-chain</button>
           <button id="submit-tip-btn" class="hidden">Submit + Tip Dev</button>
           <div id="tx-status" class="hidden"></div>
+          <button id="score-card-btn" class="hidden">Share card</button>
           <button id="share-btn" class="hidden">Share Score</button>
           <button id="result-restart-btn">Play Again</button>
         </div>
@@ -104,7 +123,36 @@
       </div>
     </div>
 
+    <!-- Tutorial Overlay -->
+    <div id="tutorial-overlay" class="hidden">
+      <div class="tutorial-box">
+        <div id="tutorial-slide">
+          <h3 id="tutorial-title">Welcome to Checkers</h3>
+          <p id="tutorial-text">Tap a piece to select it, then tap a highlighted square to move.</p>
+        </div>
+        <div class="tutorial-actions">
+          <label class="tutorial-skip"><input type="checkbox" id="tutorial-dont-show"> Don't show again</label>
+          <div>
+            <button type="button" id="tutorial-next">Next</button>
+            <button type="button" id="tutorial-start" class="hidden">Start</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Overlay -->
+    <div id="stats-overlay" class="hidden">
+      <div class="leaderboard-box stats-box">
+        <div class="lb-header">
+          <h2>My Stats</h2>
+          <button id="stats-close" class="lb-close-style">&times;</button>
+        </div>
+        <div id="stats-content"></div>
+      </div>
+    </div>
+
     <canvas id="confetti-canvas" class="confetti-layer" aria-hidden="true"></canvas>
+    <canvas id="score-card-canvas" class="hidden" width="400" height="240" aria-hidden="true"></canvas>
   </div>
 
   <script type="module" src="game.js"></script>

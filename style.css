@@ -201,12 +201,26 @@ header {
 #timer-display.hidden { display: none; }
 #timer-display.low { color: var(--accent); }
 
+#options-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px 16px;
+  padding: 6px 0 4px;
+}
+
+.option-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 #difficulty-row {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 0 4px;
   flex-wrap: wrap;
 }
 
@@ -234,6 +248,74 @@ header {
 .diff-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.color-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-dim);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.color-btn.active {
+  background: var(--accent2);
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.icon-btn {
+  padding: 4px 8px;
+  font-size: 14px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.icon-btn.active {
+  background: var(--accent2);
+  border-color: var(--gold);
+}
+
+.icon-btn.muted {
+  opacity: 0.5;
+}
+
+.theme-btn {
+  padding: 4px 8px;
+  font-size: 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-dim);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.theme-btn.active {
+  background: var(--accent2);
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+/* ===== Themes ===== */
+body[data-theme="light"] {
+  --bg: #e8e8f0;
+  --surface: #fff;
+  --text: #1a1a2e;
+  --text-dim: #555;
+  --board-dark: #b8c4d0;
+  --board-light: #d4dce4;
+}
+
+body[data-theme="classic"] {
+  --bg: #1a3d1a;
+  --surface: #2d5a2d;
+  --text: #eaeaea;
+  --text-dim: #aaccaa;
+  --board-dark: #2d5016;
+  --board-light: #4a7c23;
 }
 
 /* ===== Board ===== */
@@ -280,9 +362,19 @@ button:active {
   opacity: 0.85;
 }
 
+#stats-btn {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
 #leaderboard-btn {
   background: var(--accent2);
   border: 1px solid rgba(255,255,255,0.1);
+}
+
+#score-card-btn {
+  background: var(--accent2);
+  border: 1px solid rgba(255,255,255,0.15);
 }
 
 .confetti-layer {
@@ -494,4 +586,97 @@ button:active {
 @keyframes slideUp {
   from { transform: translateY(24px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+/* ===== Tutorial ===== */
+#tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  animation: fadeIn 0.2s ease;
+}
+
+#tutorial-overlay.hidden { display: none; }
+
+.tutorial-box {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 320px;
+  width: 92%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+.tutorial-box h3 {
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+.tutorial-box p {
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+
+.tutorial-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tutorial-skip {
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tutorial-actions div {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.tutorial-actions button {
+  padding: 8px 20px;
+  font-size: 13px;
+}
+
+/* ===== Stats Overlay ===== */
+#stats-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 200;
+  animation: fadeIn 0.2s ease;
+}
+
+#stats-overlay.hidden { display: none; }
+
+.stats-box {
+  max-height: 50vh;
+}
+
+.lb-close-style {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 24px;
+  padding: 0 6px;
+  cursor: pointer;
+}
+
+#score-card-canvas.hidden {
+  position: absolute;
+  left: -9999px;
 }
