@@ -8,6 +8,7 @@ import {
   getBalance,
   getChain,
   getConnectError,
+  formatBalanceDisplay,
 } from './wallet.js';
 import { submitScore as txSubmitScore, submitScoreAndTip, getPlayerStats, isConfigured } from './contract.js';
 import { buildLeaderboard, isApiConfigured, weiToEth, getBalance as ethBalance } from './etherscan.js';
@@ -208,15 +209,31 @@ function showWalletDisconnected() {
   }
 }
 
+async function updateWalletBalance() {
+  if (!isConnected()) return;
+  try {
+    const bal = await getBalance();
+    walletBal.textContent = formatBalanceDisplay(bal);
+    if (Number(bal) === 0) {
+      setTimeout(async () => {
+        if (!isConnected()) return;
+        const retry = await getBalance();
+        if (Number(retry) > 0) {
+          walletBal.textContent = formatBalanceDisplay(retry);
+        }
+      }, 1500);
+    }
+  } catch (_) {
+    walletBal.textContent = '—';
+  }
+}
+
 async function refreshWalletUI(useInit = true) {
   const { address, connected } = useInit ? await initWallet() : await connectWallet();
 
   if (connected && address) {
     showWalletConnected(address);
-    try {
-      const bal = await getBalance();
-      walletBal.textContent = parseFloat(bal).toFixed(4) + ' ETH';
-    } catch (_) {}
+    await updateWalletBalance();
     if (isConfigured()) loadOnchainStats(address);
   } else {
     showWalletDisconnected();

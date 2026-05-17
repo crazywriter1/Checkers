@@ -4,7 +4,12 @@ import {
   custom,
   http,
   formatEther,
+  getAddress,
 } from 'https://esm.sh/viem@2';
+const BASE_RPC_URLS = [
+  'https://mainnet.base.org',
+  'https://base.llamarpc.com',
+];
 import { baseSepolia, base } from 'https://esm.sh/viem@2/chains';
 import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk@0.3.0';
 
@@ -319,7 +324,11 @@ async function connectWithProvider(provider, userInitiated) {
   if (!addresses?.length) return false;
 
   ethProvider = provider;
-  userAddress = addresses[0];
+  try {
+    userAddress = getAddress(addresses[0]);
+  } catch {
+    userAddress = addresses[0];
+  }
   walletConnected = true;
 
   walletClient = createWalletClient({
@@ -383,7 +392,7 @@ async function tryAllProviders(userInitiated = false) {
 export async function initWallet() {
   publicClient = createPublicClient({
     chain: CHAIN,
-    transport: http(),
+    transport: http(BASE_RPC_URLS[0]),
   });
 
   if (walletConnected && userAddress) {
@@ -439,12 +448,70 @@ export function shortAddr(addr) {
   return addr.slice(0, 6) + '\u2026' + addr.slice(-4);
 }
 
+export function formatBalanceDisplay(ethStr) {
+  const n = Number(ethStr);
+  if (!Number.isFinite(n) || n === 0) return '0 ETH';
+  if (n < 0.0001) return '<0.0001 ETH';
+  return `${n.toFixed(4)} ETH`;
+}
+
 export async function getBalance() {
-  if (!publicClient || !userAddress) return '0';
+  if (!userAddress) return '0';
+
+  let addr;
   try {
-    const bal = await publicClient.getBalance({ address: userAddress });
-    return formatEther(bal);
+    addr = getAddress(userAddress);
   } catch {
     return '0';
   }
+
+  if (ethProvider?.request) {
+    try {
+      const hex = await withTimeout(
+        ethProvider.request({ method: 'eth_getBalance', params: [addr, 'latest'] }),
+        8000,
+        'provider balance timeout',
+      );
+      return formatEther(BigInt(hex));
+    } catch (e) {
+      console.warn('Provider balance:', e.message);
+    }
+  }
+
+  if (publicClient) {
+    try {
+      const bal = await withTimeout(
+        publicClient.getBalance({ address: addr }),
+        8000,
+        'viem balance timeout',
+      );
+      return formatEther(bal);
+    } catch (e) {
+      console.warn('Public client balance:', e.message);
+    }
+  }
+
+  for (const rpcUrl of BASE_RPC_URLS) {
+    try {
+      const client = createPublicClient({ chain: CHAIN, transport: http(rpcUrl) });
+      const bal = await withTimeout(
+        client.getBalance({ address: addr }),
+        8000,
+        'rpc balance timeout',
+      );
+      return formatEther(bal);
+    } catch (_) {}
+  }
+
+  try {
+    const { getBalance: fetchBalanceFromApi } = await import('./etherscan.js');
+    const wei = await fetchBalanceFromApi(addr);
+    if (wei != null && wei !== '') {
+      return formatEther(BigInt(wei));
+    }
+  } catch (e) {
+    console.warn('API balance:', e.message);
+  }
+
+  return '0';
 }
