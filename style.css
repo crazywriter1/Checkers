@@ -89,10 +89,34 @@ html, body {
   background: var(--green);
 }
 
+.wallet-connect-btn {
+  background: rgba(0, 82, 255, 0.2);
+  border: 1px solid rgba(0, 82, 255, 0.45);
+  color: #6ea8ff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.wallet-connect-btn.hidden {
+  display: none;
+}
+
+.wallet-connect-btn:active {
+  opacity: 0.85;
+}
+
 #wallet-addr {
   color: var(--text-dim);
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 11px;
+}
+
+#wallet-addr.hidden {
+  display: none;
 }
 
 #wallet-addr.username {

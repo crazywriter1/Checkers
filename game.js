@@ -1,5 +1,14 @@
 import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk@0.3.0';
-import { initWallet, getAddress, isConnected, shortAddr, getBalance, getChain } from './wallet.js';
+import {
+  initWallet,
+  connectWallet,
+  getAddress,
+  isConnected,
+  shortAddr,
+  getBalance,
+  getChain,
+  getConnectError,
+} from './wallet.js';
 import { submitScore as txSubmitScore, submitScoreAndTip, getPlayerStats, isConfigured } from './contract.js';
 import { buildLeaderboard, isApiConfigured, weiToEth, getBalance as ethBalance } from './etherscan.js';
 
@@ -33,6 +42,7 @@ const lbClose = document.getElementById('lb-close');
 const lbContent = document.getElementById('lb-content');
 const walletDot = document.getElementById('wallet-dot');
 const walletAddr = document.getElementById('wallet-addr');
+const walletConnectBtn = document.getElementById('wallet-connect-btn');
 const walletChain = document.getElementById('wallet-chain');
 const walletBal = document.getElementById('wallet-bal');
 const onchainStats = document.getElementById('onchain-stats');
@@ -172,45 +182,82 @@ function applyUserInfo(user) {
   }
 }
 
-async function refreshWalletUI() {
-  const { address, connected } = await initWallet();
+function showWalletConnected(address) {
+  walletDot.classList.add('connected');
+  if (walletConnectBtn) walletConnectBtn.classList.add('hidden');
+  walletAddr.classList.remove('hidden');
+  walletAddr.textContent = fcUser
+    ? (fcUser.displayName || fcUser.username || shortAddr(address))
+    : shortAddr(address);
+  walletAddr.title = address;
+  walletChain.textContent = getChain().name;
+}
+
+function showWalletDisconnected() {
+  walletDot.classList.remove('connected');
+  walletChain.textContent = '';
+  walletBal.textContent = '';
+  if (walletConnectBtn) {
+    walletConnectBtn.classList.remove('hidden');
+    walletConnectBtn.disabled = false;
+    walletConnectBtn.textContent = 'Tap to connect';
+  }
+  if (!fcUser) {
+    walletAddr.classList.add('hidden');
+    walletAddr.textContent = 'Not connected';
+  }
+}
+
+async function refreshWalletUI(useInit = true) {
+  const { address, connected } = useInit ? await initWallet() : await connectWallet();
 
   if (connected && address) {
-    walletDot.classList.add('connected');
-    walletAddr.textContent = fcUser
-      ? (fcUser.displayName || fcUser.username || shortAddr(address))
-      : shortAddr(address);
-    walletAddr.title = address;
-    walletChain.textContent = getChain().name;
-
+    showWalletConnected(address);
     try {
       const bal = await getBalance();
-      const short = parseFloat(bal).toFixed(4);
-      walletBal.textContent = short + ' ETH';
+      walletBal.textContent = parseFloat(bal).toFixed(4) + ' ETH';
     } catch (_) {}
-
-    if (isConfigured()) {
-      loadOnchainStats(address);
-    }
-  } else if (!fcUser) {
-    walletAddr.textContent = 'Not connected';
-    walletDot.classList.remove('connected');
+    if (isConfigured()) loadOnchainStats(address);
+  } else {
+    showWalletDisconnected();
   }
 
   return { address, connected };
 }
 
+async function handleWalletConnect() {
+  if (isConnected()) return;
+  if (walletConnectBtn) {
+    walletConnectBtn.disabled = true;
+    walletConnectBtn.textContent = 'Connecting…';
+  }
+  const { connected } = await refreshWalletUI(false);
+  if (!connected && walletConnectBtn) {
+    walletConnectBtn.disabled = false;
+    const err = getConnectError();
+    walletConnectBtn.textContent = err ? 'Retry connect' : 'Tap to connect';
+  }
+}
+
 async function initBlockchain() {
-  const { connected } = await refreshWalletUI();
+  const { connected } = await refreshWalletUI(true);
 
   if (!connected) {
-    setTimeout(async () => {
-      const retry = await refreshWalletUI();
-      if (retry.connected && isConfigured()) {
-        loadOnchainStats(retry.address);
-      }
-    }, 2000);
+    [1500, 4000].forEach((ms) => {
+      setTimeout(async () => {
+        if (isConnected()) return;
+        const retry = await refreshWalletUI(true);
+        if (retry.connected && isConfigured()) loadOnchainStats(retry.address);
+      }, ms);
+    });
   }
+}
+
+if (walletConnectBtn) {
+  walletConnectBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    handleWalletConnect();
+  });
 }
 
 async function loadOnchainStats(address) {
