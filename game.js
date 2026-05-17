@@ -172,7 +172,7 @@ function applyUserInfo(user) {
   }
 }
 
-async function initBlockchain() {
+async function refreshWalletUI() {
   const { address, connected } = await initWallet();
 
   if (connected && address) {
@@ -194,6 +194,22 @@ async function initBlockchain() {
     }
   } else if (!fcUser) {
     walletAddr.textContent = 'Not connected';
+    walletDot.classList.remove('connected');
+  }
+
+  return { address, connected };
+}
+
+async function initBlockchain() {
+  const { connected } = await refreshWalletUI();
+
+  if (!connected) {
+    setTimeout(async () => {
+      const retry = await refreshWalletUI();
+      if (retry.connected && isConfigured()) {
+        loadOnchainStats(retry.address);
+      }
+    }, 2000);
   }
 }
 
