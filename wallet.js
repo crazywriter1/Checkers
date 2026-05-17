@@ -166,7 +166,7 @@ function providerPriority(label, rdns = '') {
   return 4;
 }
 
-async function collectProviders(userInitiated = false) {
+async function collectProviders(mode = 'silent') {
   const list = [];
   const seen = new Set();
 
@@ -175,6 +175,15 @@ async function collectProviders(userInitiated = false) {
     seen.add(provider);
     list.push({ provider, label, rdns });
   };
+
+  if (mode === 'interactive') {
+    try {
+      await Promise.race([
+        sdk.actions.ready(),
+        new Promise((resolve) => setTimeout(resolve, 1500)),
+      ]);
+    } catch (_) {}
+  }
 
   const baseProvider = await createBaseAccountProvider();
   add(baseProvider, 'base-account');
@@ -185,17 +194,12 @@ async function collectProviders(userInitiated = false) {
     add(entry.provider, entry.label, entry.rdns);
   }
 
-  if (!userInitiated) {
-    add(await getFarcasterProvider(), 'farcaster');
-  } else {
-  // User tap: Farcaster last — often hangs in Base app
-    const fc = await getFarcasterProvider();
-    add(fc, 'farcaster');
-  }
+  add(await getFarcasterProvider(), 'farcaster');
 
   list.sort((a, b) => providerPriority(a.label, a.rdns) - providerPriority(b.label, b.rdns));
 
-  return userInitiated ? list.slice(0, 5) : list;
+  const limit = mode === 'interactive' ? 5 : 6;
+  return list.slice(0, limit);
 }
 
 async function providerRequest(provider, request, timeoutMs) {
@@ -263,65 +267,69 @@ function parseAccountsResult(res) {
   return [];
 }
 
-async function requestAccountsFromProvider(provider, userInitiated) {
-  const quickMs = userInitiated ? 4000 : 2000;
-  const slowMs = userInitiated ? 12000 : 3000;
+/** @typedef {'silent' | 'auto' | 'interactive'} ConnectMode */
+
+async function requestAccountsFromProvider(provider, mode) {
+  const isInteractive = mode === 'interactive';
+  const isAuto = mode === 'auto';
+  const accountsMs = isInteractive ? 4000 : 3000;
+  const requestMs = isInteractive ? 12000 : 6000;
 
   try {
     const cached = await providerRequest(
       provider,
       { method: 'eth_accounts' },
-      quickMs,
+      accountsMs,
     );
     if (cached?.length) return cached;
   } catch (e) {
     lastConnectError = e?.message || String(e);
   }
 
-  if (!userInitiated) return [];
+  if (mode === 'silent') return [];
 
   try {
     const accounts = await providerRequest(
       provider,
       { method: 'eth_requestAccounts' },
-      slowMs,
+      requestMs,
     );
     if (accounts?.length) return accounts;
   } catch (e) {
     lastConnectError = e?.message || String(e);
   }
 
-  if (provider.request) {
-    try {
-      const nonce = crypto.randomUUID().replace(/-/g, '');
-      const res = await providerRequest(
-        provider,
-        {
-          method: 'wallet_connect',
-          params: [{
-            version: '1',
-            capabilities: {
-              signInWithEthereum: {
-                nonce,
-                chainId: CHAIN_ID_HEX,
-              },
+  if (!isInteractive || !provider.request) return [];
+
+  try {
+    const nonce = crypto.randomUUID().replace(/-/g, '');
+    const res = await providerRequest(
+      provider,
+      {
+        method: 'wallet_connect',
+        params: [{
+          version: '1',
+          capabilities: {
+            signInWithEthereum: {
+              nonce,
+              chainId: CHAIN_ID_HEX,
             },
-          }],
-        },
-        slowMs,
-      );
-      const parsed = parseAccountsResult(res);
-      if (parsed.length) return parsed;
-    } catch (e) {
-      lastConnectError = e?.message || String(e);
-    }
+          },
+        }],
+      },
+      requestMs,
+    );
+    const parsed = parseAccountsResult(res);
+    if (parsed.length) return parsed;
+  } catch (e) {
+    lastConnectError = e?.message || String(e);
   }
 
   return [];
 }
 
-async function connectWithProvider(provider, userInitiated) {
-  const addresses = await requestAccountsFromProvider(provider, userInitiated);
+async function connectWithProvider(provider, mode) {
+  const addresses = await requestAccountsFromProvider(provider, mode);
   if (!addresses?.length) return false;
 
   ethProvider = provider;
@@ -345,7 +353,7 @@ async function connectWithProvider(provider, userInitiated) {
   return true;
 }
 
-async function tryAllProviders(userInitiated = false) {
+async function tryAllProviders(mode = 'silent') {
   if (connectInFlight) {
     return walletConnected;
   }
@@ -353,24 +361,25 @@ async function tryAllProviders(userInitiated = false) {
   lastConnectError = '';
 
   try {
-    const providers = await collectProviders(userInitiated);
+    const providers = await collectProviders(mode);
 
     if (!providers.length) {
       lastConnectError = 'No wallet provider found';
       return false;
     }
 
-    const perProviderMs = userInitiated ? 14000 : 4000;
+    const perProviderMs =
+      mode === 'interactive' ? 14000 : mode === 'auto' ? 8000 : 4000;
 
     for (const { provider, label } of providers) {
       try {
         const ok = await withTimeout(
-          connectWithProvider(provider, userInitiated),
+          connectWithProvider(provider, mode),
           perProviderMs,
           `${label} timed out`,
         );
         if (ok) {
-          console.info('Wallet connected via', label);
+          console.info('Wallet connected via', label, `(${mode})`);
           return true;
         }
       } catch (e) {
@@ -380,9 +389,10 @@ async function tryAllProviders(userInitiated = false) {
     }
 
     if (!lastConnectError) {
-      lastConnectError = userInitiated
-        ? 'Wallet did not respond — approve in Base if prompted'
-        : 'Not connected';
+      lastConnectError =
+        mode === 'interactive'
+          ? 'Wallet did not respond — approve in Base if prompted'
+          : 'Not connected';
     }
     return false;
   } finally {
@@ -390,27 +400,36 @@ async function tryAllProviders(userInitiated = false) {
   }
 }
 
-export async function initWallet() {
-  publicClient = createPublicClient({
-    chain: CHAIN,
-    transport: http(BASE_RPC_URLS[0]),
-  });
+function ensurePublicClient() {
+  if (!publicClient) {
+    publicClient = createPublicClient({
+      chain: CHAIN,
+      transport: http(BASE_RPC_URLS[0]),
+    });
+  }
+}
 
+/** Silent + auto connect on load (no wallet_connect popup) */
+export async function autoConnectWallet() {
   if (walletConnected && userAddress) {
     return { address: userAddress, connected: true, error: '' };
   }
 
-  walletClient = null;
-  ethProvider = null;
-  userAddress = null;
-  walletConnected = false;
+  ensurePublicClient();
 
-  const ok = await tryAllProviders(false);
+  let ok = await tryAllProviders('silent');
+  if (!ok) ok = await tryAllProviders('auto');
+
   if (!ok) {
-    console.warn('Wallet init failed:', lastConnectError || 'unknown');
+    console.warn('Auto-connect:', lastConnectError || 'not available yet');
   }
 
   return { address: userAddress, connected: walletConnected, error: lastConnectError };
+}
+
+export async function initWallet() {
+  ensurePublicClient();
+  return autoConnectWallet();
 }
 
 export async function connectWallet() {
@@ -425,7 +444,7 @@ export async function connectWallet() {
 
   try {
     const ok = await withTimeout(
-      tryAllProviders(true),
+      tryAllProviders('interactive'),
       28000,
       'Connection timed out — try again',
     );

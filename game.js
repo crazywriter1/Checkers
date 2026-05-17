@@ -1,6 +1,7 @@
 import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk@0.3.0';
 import {
   initWallet,
+  autoConnectWallet,
   connectWallet,
   getAddress,
   isConnected,
@@ -228,8 +229,8 @@ async function updateWalletBalance() {
   }
 }
 
-async function refreshWalletUI(useInit = true) {
-  const { address, connected } = useInit ? await initWallet() : await connectWallet();
+async function refreshWalletUI(auto = true) {
+  const { address, connected } = auto ? await autoConnectWallet() : await connectWallet();
 
   if (connected && address) {
     showWalletConnected(address);
@@ -249,7 +250,7 @@ async function handleWalletConnect() {
     walletConnectBtn.textContent = 'Connecting…';
   }
   try {
-    const { connected } = await refreshWalletUI(false);
+    const { connected } = await refreshWalletUI(false); // manual tap
     if (connected) return;
     if (walletConnectBtn) {
       const err = getConnectError();
@@ -265,16 +266,22 @@ async function handleWalletConnect() {
 }
 
 async function initBlockchain() {
-  const { connected } = await refreshWalletUI(true);
+  const { connected, address } = await refreshWalletUI(true);
 
   if (!connected) {
-    [1500, 4000].forEach((ms) => {
+    [600, 2000, 5000].forEach((ms) => {
       setTimeout(async () => {
         if (isConnected()) return;
-        const retry = await refreshWalletUI(true);
-        if (retry.connected && isConfigured()) loadOnchainStats(retry.address);
+        const retry = await autoConnectWallet();
+        if (retry.connected) {
+          showWalletConnected(retry.address);
+          await updateWalletBalance();
+          if (isConfigured()) loadOnchainStats(retry.address);
+        }
       }, ms);
     });
+  } else if (address && isConfigured()) {
+    loadOnchainStats(address);
   }
 }
 
