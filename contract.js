@@ -37,16 +37,16 @@ export async function submitScore(captured) {
   if (!isConfigured()) throw new Error('Contract not configured');
   const wc = getWalletClient();
   const addr = getAddress();
+  const chain = getChain();
   if (!wc || !addr) throw new Error('Wallet not connected');
 
-  const hash = await wc.sendTransaction({
-    to: CONTRACT_ADDRESS,
-    data: encodeFunctionData({
-      abi: CONTRACT_ABI,
-      functionName: 'submitScore',
-      args: [BigInt(captured)],
-    }),
+  const hash = await wc.writeContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'submitScore',
+    args: [BigInt(captured)],
     account: addr,
+    chain,
   });
 
   return hash;

@@ -1,4 +1,4 @@
-import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk';
+import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk@0.3.0';
 import { initWallet, getAddress, isConnected, shortAddr, getBalance, getChain } from './wallet.js';
 import { submitScore as txSubmitScore, submitScoreAndTip, getPlayerStats, isConfigured } from './contract.js';
 import { buildLeaderboard, isApiConfigured, weiToEth, getBalance as ethBalance } from './etherscan.js';
@@ -177,9 +177,10 @@ async function initBlockchain() {
 
   if (connected && address) {
     walletDot.classList.add('connected');
-    if (!fcUser) {
-      walletAddr.textContent = shortAddr(address);
-    }
+    walletAddr.textContent = fcUser
+      ? (fcUser.displayName || fcUser.username || shortAddr(address))
+      : shortAddr(address);
+    walletAddr.title = address;
     walletChain.textContent = getChain().name;
 
     try {
@@ -1193,7 +1194,7 @@ async function shareScoreCard() {
 (async () => {
   loadSettings();
   await initSDK();
-  initBlockchain();
+  await initBlockchain();
   init();
   showTutorialIfNeeded();
 })();
