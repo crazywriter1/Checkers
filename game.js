@@ -231,11 +231,19 @@ async function handleWalletConnect() {
     walletConnectBtn.disabled = true;
     walletConnectBtn.textContent = 'Connecting…';
   }
-  const { connected } = await refreshWalletUI(false);
-  if (!connected && walletConnectBtn) {
-    walletConnectBtn.disabled = false;
-    const err = getConnectError();
-    walletConnectBtn.textContent = err ? 'Retry connect' : 'Tap to connect';
+  try {
+    const { connected } = await refreshWalletUI(false);
+    if (connected) return;
+    if (walletConnectBtn) {
+      const err = getConnectError();
+      walletConnectBtn.textContent = err ? 'Retry connect' : 'Tap to connect';
+    }
+  } catch (_) {
+    if (walletConnectBtn) walletConnectBtn.textContent = 'Retry connect';
+  } finally {
+    if (walletConnectBtn && !isConnected()) {
+      walletConnectBtn.disabled = false;
+    }
   }
 }
 
