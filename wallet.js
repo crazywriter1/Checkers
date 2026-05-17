@@ -4,14 +4,15 @@ import {
   custom,
   http,
   formatEther,
-  getAddress,
+  getAddress as toChecksumAddress,
 } from 'https://esm.sh/viem@2';
+import { baseSepolia, base } from 'https://esm.sh/viem@2/chains';
+import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk@0.3.0';
+
 const BASE_RPC_URLS = [
   'https://mainnet.base.org',
   'https://base.llamarpc.com',
 ];
-import { baseSepolia, base } from 'https://esm.sh/viem@2/chains';
-import { sdk } from 'https://esm.sh/@farcaster/miniapp-sdk@0.3.0';
 
 const APP_NAME = 'Checkers';
 const APP_LOGO = 'https://checkers-ebon.vercel.app/icon.png';
@@ -325,7 +326,7 @@ async function connectWithProvider(provider, userInitiated) {
 
   ethProvider = provider;
   try {
-    userAddress = getAddress(addresses[0]);
+    userAddress = toChecksumAddress(addresses[0]);
   } catch {
     userAddress = addresses[0];
   }
@@ -460,7 +461,7 @@ export async function getBalance() {
 
   let addr;
   try {
-    addr = getAddress(userAddress);
+    addr = toChecksumAddress(userAddress);
   } catch {
     return '0';
   }

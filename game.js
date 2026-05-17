@@ -1281,8 +1281,12 @@ async function shareScoreCard() {
 // ===== Boot =====
 (async () => {
   loadSettings();
-  await initSDK();
-  await initBlockchain();
   init();
+  try {
+    await initSDK();
+    await initBlockchain();
+  } catch (e) {
+    console.warn('Wallet setup failed, game still playable:', e);
+  }
   showTutorialIfNeeded();
 })();
